@@ -19,7 +19,7 @@ import {
 
 export function createGame(root, { onScore, onGameOver, onFeedback = () => {} }) {
   const engine = createEngine(root);
-  const input = createInput(root);
+  const input = createInput(engine.renderer.domElement);
   const score = createScoring();
 
   const player = createPlayer();
