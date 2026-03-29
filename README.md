@@ -4,18 +4,20 @@ Hypervoid Runner is a browser-based 3D tunnel runner built with Three.js and Vit
 
 ## Current Gameplay
 
-- Username entry screen with local username persistence
-- Loading screen while the Mirage glTF player asset is fetched
+- Home screen with local username persistence, gameplay rules, and live pickup/hazard previews
+- Loading screen while the Mirage player model and coin GLB are fetched
 - Mirage controller player model loaded from `public/models/mirage/`
+- Coin pickup model loaded from `public/models/coins/`
 - Desktop controls with `W/A/S/D` or arrow keys
 - Mobile controls with drag-based steering
 - Unified input intent layer for consistent steering across desktop and mobile
 - Full `X/Y` movement inside a circular tunnel boundary
 - Randomized asteroid and coin spawning with progressive difficulty
 - Event-driven scoring with combo growth from coins and near misses
-- Visible live combo multiplier in the HUD and game-over summary
+- Visible live combo multiplier in the HUD and score summary
 - Temporary coin pickup audio only
-- HUD, loading overlay, start screen, restart flow, and game-over screen
+- `Home -> Game -> Score -> Return Home` flow
+- Leaderboard-ready home and score layouts reserved for future top-30 and top-200 rankings
 
 ## Controls
 
@@ -54,12 +56,12 @@ The project now follows a state-driven split between simulation and rendering.
   - Single source of truth for player, run, world, and entity state
 - `src/systems/`
   - Gameplay logic only
-  - Input intent, player simulation, difficulty, pattern selection, spawning, item movement, collision, scoring, and audio event handling
+  - Input intent, player simulation, difficulty, spawning, item movement, collision, scoring, and audio event handling
 - `src/visuals/`
   - Rendering only
-  - Mesh creation, mesh syncing, player render behavior, tunnel visuals, and particle visuals
+  - Mesh creation, mesh syncing, player render behavior, tunnel visuals, particle visuals, and home-screen item previews
 - `src/ui/`
-  - Read-only DOM overlays for start, loading, HUD, and game-over states
+  - Read-only DOM overlays for home, loading, HUD, and score states
 
 The main loop in `src/systems/gameLoop.js` keeps simulation and rendering separated:
 
@@ -83,6 +85,8 @@ The main loop in `src/systems/gameLoop.js` keeps simulation and rendering separa
 hypervoid-runner/
 - public/
   - models/
+    - coins/
+      - base_basic_shaded.glb
     - mirage/
       - Miragej.gltf
       - Miragej.bin
@@ -110,6 +114,7 @@ hypervoid-runner/
     - math.js
     - storage.js
   - visuals/
+    - itemPreview.js
     - items.js
     - itemsRender.js
     - particles.js
@@ -144,6 +149,22 @@ The input layer applies:
 ### Spawning
 
 `src/systems/spawnSystem.js` uses randomized forward spawn frontiers for coins and hazards. Difficulty increases tighten spawn gaps and raise object pressure over time.
+
+### UI Flow
+
+The current overlay flow is:
+
+- Home screen
+  - username input
+  - pickup / hazard explanation
+  - future top-30 leaderboard placeholder
+- Game screen
+  - in-run HUD only
+- Score screen
+  - run summary
+  - best combo summary
+  - return-home action
+  - future top-200 leaderboard placeholder
 
 ### Audio
 
@@ -209,6 +230,19 @@ When deploying from Git:
 4. Redeploy after enabling LFS
 
 Without Git LFS enabled, `Miragej.bin` may be served as an LFS pointer instead of the real binary asset.
+
+## Coin Asset Notes
+
+The coin pickup model is loaded from:
+
+- `public/models/coins/base_basic_shaded.glb`
+
+The startup loading overlay now waits for both:
+
+- the Mirage player model
+- the coin pickup model
+
+This prevents the game from starting before the core visible 3D assets are ready.
 
 ## Temporary Audio Notes
 
