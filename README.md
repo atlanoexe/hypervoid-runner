@@ -1,4 +1,4 @@
-# hypervoid-runner
+# GameDex From hypervoid-runner
 
 A fast-paced web-based 3D tunnel runner built with **Three.js + Vite**. You navigate left/right through a neon wormhole, collect **K coins**, avoid obstacles, and push for a high score.
 
