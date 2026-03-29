@@ -69,6 +69,31 @@ export function createGameOverScreen(root) {
   };
 }
 
+export function createLoadingScreen(root) {
+  const panel = cardTemplate(
+    'Loading Player',
+    '<p class="lede">Loading Mirage controller assets...</p><div class="loading-stack"><div class="progress-shell"><div id="progress-fill" class="progress-fill"></div></div><p id="progress-text" class="progress-text">0%</p></div>'
+  );
+  root.appendChild(panel);
+
+  const progressFill = panel.querySelector('#progress-fill');
+  const progressText = panel.querySelector('#progress-text');
+
+  return {
+    show() {
+      panel.classList.remove('hidden');
+    },
+    hide() {
+      panel.classList.add('hidden');
+    },
+    setProgress(value) {
+      const progress = Math.round(Math.min(100, Math.max(0, value * 100)));
+      progressFill.style.width = `${progress}%`;
+      progressText.textContent = `${progress}%`;
+    }
+  };
+}
+
 export function createHud(root) {
   const hud = document.createElement('div');
   hud.id = 'hud';

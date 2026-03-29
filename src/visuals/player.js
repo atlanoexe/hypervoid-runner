@@ -104,8 +104,32 @@ function createFallbackShip() {
 export function createPlayer() {
   const group = new THREE.Group();
   const shipVisual = new THREE.Group();
-  const loader = new GLTFLoader();
+  const progressListeners = new Set();
   const emissiveMaterials = [];
+  let resolveReady = null;
+  let currentProgress = 0;
+  let hasLoadedMirage = false;
+  const ready = new Promise((resolve) => {
+    resolveReady = resolve;
+  });
+
+  const manager = new THREE.LoadingManager();
+  const loader = new GLTFLoader(manager);
+
+  function emitProgress(nextProgress) {
+    currentProgress = Math.max(currentProgress, Math.min(1, nextProgress));
+
+    for (const listener of progressListeners) {
+      listener(currentProgress);
+    }
+  }
+
+  manager.onStart = () => emitProgress(0.05);
+  manager.onProgress = (_, loaded, total) => {
+    if (!total) return;
+    emitProgress(loaded / total);
+  };
+  manager.onLoad = () => emitProgress(1);
 
   const glowMaterial = new THREE.MeshStandardMaterial({
     color: 0x7cf4ff,
@@ -136,10 +160,15 @@ export function createPlayer() {
       collectEmissiveMaterials(importedShip, emissiveMaterials);
       glowCore.visible = false;
       shipVisual.add(modelPivot);
+      hasLoadedMirage = true;
+      emitProgress(1);
+      resolveReady?.(true);
     },
     undefined,
     (error) => {
       console.error('Failed to load Mirage player model:', error);
+      emitProgress(1);
+      resolveReady?.(false);
     }
   );
 
@@ -154,6 +183,17 @@ export function createPlayer() {
 
   return {
     mesh: group,
+    ready() {
+      return ready;
+    },
+    isMirageLoaded() {
+      return hasLoadedMirage;
+    },
+    onLoadProgress(callback) {
+      progressListeners.add(callback);
+      callback(currentProgress);
+      return () => progressListeners.delete(callback);
+    },
     pulse(amount = 0.6) {
       glowPulse = Math.min(1.6, glowPulse + amount);
     },

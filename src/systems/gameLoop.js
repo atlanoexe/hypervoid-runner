@@ -198,6 +198,15 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   tick();
 
   return {
+    ready() {
+      return player.ready();
+    },
+    onLoadProgress(callback) {
+      return player.onLoadProgress(callback);
+    },
+    isPlayerModelLoaded() {
+      return player.isMirageLoaded();
+    },
     start(nextName) {
       username = nextName;
       speed = BASE_SPEED;
