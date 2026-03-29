@@ -1,3 +1,10 @@
+function formatTime(seconds) {
+  const whole = Math.floor(seconds);
+  const mins = String(Math.floor(whole / 60)).padStart(2, '0');
+  const secs = String(whole % 60).padStart(2, '0');
+  return `${mins}:${secs}`;
+}
+
 function cardTemplate(title, bodyHtml) {
   const panel = document.createElement('div');
   panel.className = 'panel hidden';
@@ -6,7 +13,10 @@ function cardTemplate(title, bodyHtml) {
 }
 
 export function createStartScreen(root) {
-  const panel = cardTemplate('Hypervoid Runner', '<p>Race the tunnel, collect K coins, and dodge hazards.</p><input id="name" maxlength="24" placeholder="Enter username" /><button id="start">Start Game</button>');
+  const panel = cardTemplate(
+    'Hypervoid Runner',
+    '<p class="lede">Thread the digital tunnel, collect K coins, and dodge shifting hazards.</p><label class="field"><span>Pilot</span><input id="name" maxlength="24" placeholder="Enter username" /></label><div class="hint-list"><span>Desktop: A / D or Arrow Keys</span><span>Mobile: drag left or right to steer</span></div><button id="start">Launch Run</button>'
+  );
   root.appendChild(panel);
 
   const input = panel.querySelector('#name');
@@ -14,29 +24,44 @@ export function createStartScreen(root) {
 
   return {
     onStart(cb) {
-      button.onclick = () => {
+      const start = () => {
         const name = (input.value || 'Pilot').trim().slice(0, 24);
         cb(name || 'Pilot');
       };
+
+      button.onclick = start;
+      input.onkeydown = (event) => {
+        if (event.key === 'Enter') start();
+      };
     },
     setName(name) { input.value = name; },
-    show() { panel.classList.remove('hidden'); },
+    show() {
+      panel.classList.remove('hidden');
+      requestAnimationFrame(() => input.focus());
+    },
     hide() { panel.classList.add('hidden'); }
   };
 }
 
 export function createGameOverScreen(root) {
-  const panel = cardTemplate('Run Failed', '<p id="score"></p><p id="best"></p><button id="restart">Restart</button>');
+  const panel = cardTemplate(
+    'Run Failed',
+    '<p class="lede">The tunnel collapsed around your ship.</p><div class="results"><p id="pilot"></p><p id="score"></p><p id="coins"></p><p id="time"></p></div><button id="restart">Restart</button>'
+  );
   root.appendChild(panel);
 
+  const pilotText = panel.querySelector('#pilot');
   const scoreText = panel.querySelector('#score');
-  const bestText = panel.querySelector('#best');
+  const coinsText = panel.querySelector('#coins');
+  const timeText = panel.querySelector('#time');
   const button = panel.querySelector('#restart');
 
   return {
-    show({ score, best }) {
-      scoreText.textContent = `Score: ${score} K`;
-      bestText.textContent = `Best: ${best} K`;
+    show({ username, score, coins, time }) {
+      pilotText.textContent = `Pilot: ${username}`;
+      scoreText.textContent = `Final Score: ${score.toLocaleString()}`;
+      coinsText.textContent = `K Coins: ${coins}`;
+      timeText.textContent = `Survival Time: ${formatTime(time)}`;
       panel.classList.remove('hidden');
     },
     hide() { panel.classList.add('hidden'); },
@@ -48,18 +73,42 @@ export function createHud(root) {
   const hud = document.createElement('div');
   hud.id = 'hud';
   hud.className = 'hidden';
-  hud.innerHTML = '<span id="score">K Coins: 0</span><span id="speed">Speed: 1.0x</span>';
+  hud.innerHTML = '<section class="hud-chip"><span class="hud-label">Pilot</span><strong id="username" class="hud-value">Pilot</strong></section><section class="hud-chip"><span class="hud-label">Score</span><strong id="score" class="hud-value">0</strong></section><section class="hud-chip"><span class="hud-label">Timer</span><strong id="timer" class="hud-value">00:00</strong></section><section class="hud-chip"><span class="hud-label">K Coins</span><strong id="coins" class="hud-value">0</strong></section>';
   root.appendChild(hud);
 
+  const username = hud.querySelector('#username');
   const score = hud.querySelector('#score');
-  const speed = hud.querySelector('#speed');
+  const timer = hud.querySelector('#timer');
+  const coins = hud.querySelector('#coins');
 
   return {
-    update(nextScore, nextSpeed) {
-      score.textContent = `K Coins: ${nextScore}`;
-      speed.textContent = `Speed: ${nextSpeed.toFixed(2)}x`;
+    update(nextState) {
+      username.textContent = nextState.username;
+      score.textContent = nextState.score.toLocaleString();
+      timer.textContent = formatTime(nextState.time);
+      coins.textContent = String(nextState.coins);
     },
     show() { hud.classList.remove('hidden'); },
     hide() { hud.classList.add('hidden'); }
+  };
+}
+
+export function createFeedbackLayer(root) {
+  const layer = document.createElement('div');
+  layer.id = 'feedback-layer';
+  root.appendChild(layer);
+
+  let timeoutId = null;
+
+  return {
+    pulse(kind = 'coin') {
+      layer.className = kind;
+      layer.classList.remove('active');
+      void layer.offsetWidth;
+      layer.classList.add('active');
+
+      if (timeoutId) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => layer.classList.remove('active'), kind === 'collision' ? 260 : 180);
+    }
   };
 }

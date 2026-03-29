@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { lerp } from '../utils/math.js';
 
 export function createEngine(container) {
   const scene = new THREE.Scene();
@@ -9,6 +10,7 @@ export function createEngine(container) {
 
   const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 500);
   camera.position.set(0, 0, 11);
+  const baseCamera = camera.position.clone();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -26,6 +28,11 @@ export function createEngine(container) {
   key.position.set(0, 6, 10);
   scene.add(ambient, key);
 
+  let driftX = 0;
+  let roll = 0;
+  let shake = 0;
+  let pulse = 0;
+
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -40,6 +47,29 @@ export function createEngine(container) {
     camera,
     renderer,
     composer,
+    bump(amount = 0.3) {
+      shake = Math.min(1.5, shake + amount);
+      pulse = Math.min(1.1, pulse + amount * 0.55);
+    },
+    update(dt, elapsed, speed, playerX, steer) {
+      driftX = lerp(driftX, playerX * 0.16, Math.min(1, dt * 4));
+      roll = lerp(roll, -steer * 0.04, Math.min(1, dt * 5));
+      shake = Math.max(0, shake - dt * 1.9);
+      pulse = Math.max(0, pulse - dt * 2.2);
+
+      const jitterX = Math.sin(elapsed * 48) * shake * 0.08;
+      const jitterY = Math.cos(elapsed * 42) * shake * 0.05;
+
+      camera.position.x = baseCamera.x + driftX + jitterX;
+      camera.position.y = baseCamera.y + jitterY;
+      camera.position.z = baseCamera.z - Math.min(0.65, (speed - 1) * 0.12) + pulse * 0.08;
+      camera.rotation.z = roll + jitterX * 0.015;
+      camera.fov = 65 + Math.min(9, (speed - 1) * 2.2) + pulse * 1.8;
+      camera.updateProjectionMatrix();
+
+      bloom.strength = 0.8 + Math.min(0.55, speed * 0.08) + pulse * 0.18;
+      key.intensity = 1.15 + pulse * 0.45 + speed * 0.04;
+    },
     dispose() {
       window.removeEventListener('resize', onResize);
       renderer.dispose();

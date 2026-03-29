@@ -1,5 +1,11 @@
 export const TUNNEL_RADIUS = 11;
-export const LANE_LIMIT = 7.2;
-export const PLAYER_Y = -0.5;
-export const PLAYER_RADIUS = 0.9;
-export const MAX_POOL_ITEMS = 42;
+export const LANE_LIMIT = 6.9;
+export const PLAYER_Y = -0.35;
+export const PLAYER_Z = 8;
+export const PLAYER_RADIUS = 0.92;
+export const MAX_POOL_ITEMS = 56;
+export const BASE_SPEED = 1.2;
+export const MAX_SPEED = 4.8;
+export const SPEED_SMOOTHING = 2.8;
+export const SCORE_TIME_DIVISOR = 18;
+export const SPAWN_LOOKAHEAD = 170;

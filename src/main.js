@@ -1,20 +1,20 @@
 import { createGame } from './systems/gameLoop.js';
-import { createStartScreen, createGameOverScreen, createHud } from './ui/screens.js';
-import { loadUsername, saveUsername, saveBestScore, loadBestScore } from './utils/storage.js';
+import { createStartScreen, createGameOverScreen, createHud, createFeedbackLayer } from './ui/screens.js';
+import { loadUsername, saveUsername } from './utils/storage.js';
 
 const app = document.getElementById('app');
 
 const hud = createHud(app);
+const feedback = createFeedbackLayer(app);
 const startScreen = createStartScreen(app);
 const gameOverScreen = createGameOverScreen(app);
 
 const game = createGame(app, {
-  onScore: (score, speed) => hud.update(score, speed),
-  onGameOver: ({ score, username }) => {
+  onScore: (state) => hud.update(state),
+  onFeedback: (kind) => feedback.pulse(kind),
+  onGameOver: ({ score, coins, time, username }) => {
     hud.hide();
-    const best = loadBestScore(username);
-    if (score > best) saveBestScore(username, score);
-    gameOverScreen.show({ score, best: loadBestScore(username) });
+    gameOverScreen.show({ username, score, coins, time });
   }
 });
 
