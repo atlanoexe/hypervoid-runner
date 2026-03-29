@@ -1,8 +1,11 @@
 export const TUNNEL_RADIUS = 11;
 export const LANE_LIMIT = 6.9;
+export const VERTICAL_LIMIT = 4.2;
 export const PLAYER_Y = -0.35;
 export const PLAYER_Z = 8;
-export const PLAYER_RADIUS = 0.92;
+export const PLAYER_SCALE = 0.7;
+export const ITEM_SCALE = 0.7;
+export const PLAYER_RADIUS = 0.644;
 export const MAX_POOL_ITEMS = 56;
 export const BASE_SPEED = 1.2;
 export const MAX_SPEED = 4.8;

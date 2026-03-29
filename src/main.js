@@ -8,11 +8,13 @@ const hud = createHud(app);
 const feedback = createFeedbackLayer(app);
 const startScreen = createStartScreen(app);
 const gameOverScreen = createGameOverScreen(app);
+let currentUsername = 'Pilot';
 
 const game = createGame(app, {
   onScore: (state) => hud.update(state),
   onFeedback: (kind) => feedback.pulse(kind),
   onGameOver: ({ score, coins, time, username }) => {
+    currentUsername = username;
     hud.hide();
     gameOverScreen.show({ username, score, coins, time });
   }
@@ -23,6 +25,7 @@ startScreen.setName(initialName);
 startScreen.show();
 
 startScreen.onStart((username) => {
+  currentUsername = username;
   saveUsername(username);
   gameOverScreen.hide();
   startScreen.hide();
@@ -31,5 +34,8 @@ startScreen.onStart((username) => {
 });
 
 gameOverScreen.onRestart(() => {
-  startScreen.show();
+  gameOverScreen.hide();
+  startScreen.hide();
+  hud.show();
+  game.start(currentUsername);
 });

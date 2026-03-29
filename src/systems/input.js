@@ -3,11 +3,12 @@ import { clamp, lerp } from '../utils/math.js';
 export function createInput(surface) {
   const pressed = new Set();
   let pointerId = null;
-  let touchAxis = 0;
-  let carryAxis = 0;
+  let touchAxisX = 0;
+  let touchAxisY = 0;
   let lastPointerX = 0;
+  let lastPointerY = 0;
 
-  const steerKeys = new Set(['a', 'd', 'arrowleft', 'arrowright']);
+  const steerKeys = new Set(['a', 'd', 'w', 's', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown']);
   surface.style.touchAction = 'none';
 
   const onKeyDown = (e) => {
@@ -23,24 +24,28 @@ export function createInput(surface) {
   const onPointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     pointerId = e.pointerId;
-    carryAxis = touchAxis;
     lastPointerX = e.clientX;
-    touchAxis = 0;
+    lastPointerY = e.clientY;
+    touchAxisX = 0;
+    touchAxisY = 0;
     surface.setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (e) => {
     if (e.pointerId !== pointerId) return;
     const width = Math.max(window.innerWidth, 1);
-    const delta = (e.clientX - lastPointerX) / width;
+    const height = Math.max(window.innerHeight, 1);
+    const deltaX = (e.clientX - lastPointerX) / width;
+    const deltaY = (e.clientY - lastPointerY) / height;
     lastPointerX = e.clientX;
-    touchAxis = clamp(touchAxis + delta * 10, -1, 1);
+    lastPointerY = e.clientY;
+    touchAxisX = clamp(touchAxisX + deltaX * 10, -1, 1);
+    touchAxisY = clamp(touchAxisY - deltaY * 10, -1, 1);
   };
 
   const releasePointer = (e) => {
     if (e.pointerId !== pointerId) return;
     pointerId = null;
-    carryAxis = touchAxis;
   };
 
   window.addEventListener('keydown', onKeyDown);
@@ -53,22 +58,29 @@ export function createInput(surface) {
   return {
     update(dt) {
       if (pointerId === null) {
-        touchAxis = lerp(touchAxis, 0, Math.min(1, dt * 7));
-        carryAxis = lerp(carryAxis, 0, Math.min(1, dt * 4));
+        touchAxisX = lerp(touchAxisX, 0, Math.min(1, dt * 7));
+        touchAxisY = lerp(touchAxisY, 0, Math.min(1, dt * 7));
       }
     },
-    axis() {
+    axes() {
       const left = pressed.has('a') || pressed.has('arrowleft');
       const right = pressed.has('d') || pressed.has('arrowright');
-      const keyAxis = Number(right) - Number(left);
-      return keyAxis !== 0 ? keyAxis : touchAxis;
+      const up = pressed.has('w') || pressed.has('arrowup');
+      const down = pressed.has('s') || pressed.has('arrowdown');
+      const keyAxisX = Number(right) - Number(left);
+      const keyAxisY = Number(up) - Number(down);
+      return {
+        x: keyAxisX !== 0 ? keyAxisX : touchAxisX,
+        y: keyAxisY !== 0 ? keyAxisY : touchAxisY
+      };
     },
     reset() {
       pressed.clear();
       pointerId = null;
-      touchAxis = 0;
-      carryAxis = 0;
+      touchAxisX = 0;
+      touchAxisY = 0;
       lastPointerX = 0;
+      lastPointerY = 0;
     },
     dispose() {
       window.removeEventListener('keydown', onKeyDown);
