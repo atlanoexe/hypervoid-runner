@@ -5,6 +5,11 @@ import { lerp } from '../utils/math.js';
 
 const PLAYER_MODEL_URL = '/models/mirage/Miragej.gltf';
 const PLAYER_MODEL_SIZE = 3.4;
+const PLAYER_MODEL_TILT_X = Math.PI - Math.PI / 4;
+const PLAYER_MODEL_TURN_Y = Math.PI;
+const PLAYER_MODEL_ROLL_Z = 0;
+const IMPORTED_EMISSIVE_MIN = 0.02;
+const IMPORTED_EMISSIVE_MAX = 0.08;
 
 function collectEmissiveMaterials(root, target) {
   root.traverse((node) => {
@@ -13,15 +18,24 @@ function collectEmissiveMaterials(root, target) {
 
     for (const material of materials) {
       if (!material || !('emissiveIntensity' in material)) continue;
+      const baseIntensity = material.emissiveIntensity ?? 1;
+      const tunedIntensity = Math.min(
+        IMPORTED_EMISSIVE_MAX,
+        Math.max(IMPORTED_EMISSIVE_MIN, baseIntensity * 0.03)
+      );
+      material.emissiveIntensity = tunedIntensity;
       target.push({
         material,
-        baseIntensity: material.emissiveIntensity ?? 1
+        baseIntensity: tunedIntensity
       });
     }
   });
 }
 
-function normalizeModel(root) {
+function createCenteredPivot(root) {
+  const pivot = new THREE.Group();
+  pivot.add(root);
+
   const box = new THREE.Box3().setFromObject(root);
   const center = new THREE.Vector3();
   const size = new THREE.Vector3();
@@ -32,12 +46,9 @@ function normalizeModel(root) {
 
   const maxDimension = Math.max(size.x, size.y, size.z) || 1;
   const scale = PLAYER_MODEL_SIZE / maxDimension;
-  root.scale.setScalar(scale);
+  pivot.scale.setScalar(scale);
 
-  const alignedBox = new THREE.Box3().setFromObject(root);
-  const alignedCenter = new THREE.Vector3();
-  alignedBox.getCenter(alignedCenter);
-  root.position.sub(alignedCenter);
+  return pivot;
 }
 
 function createFallbackShip() {
@@ -99,9 +110,11 @@ export function createPlayer() {
   const glowMaterial = new THREE.MeshStandardMaterial({
     color: 0x7cf4ff,
     emissive: 0x3dfffb,
-    emissiveIntensity: 1.9,
+    emissiveIntensity: 0.06,
     metalness: 0,
-    roughness: 0.08
+    roughness: 0.08,
+    transparent: true,
+    opacity: 0.08
   });
 
   const glowCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), glowMaterial);
@@ -118,9 +131,11 @@ export function createPlayer() {
       shipVisual.clear();
 
       const importedShip = gltf.scene;
-      normalizeModel(importedShip);
+      const modelPivot = createCenteredPivot(importedShip);
+      modelPivot.rotation.set(PLAYER_MODEL_TILT_X, PLAYER_MODEL_TURN_Y, PLAYER_MODEL_ROLL_Z);
       collectEmissiveMaterials(importedShip, emissiveMaterials);
-      shipVisual.add(importedShip);
+      glowCore.visible = false;
+      shipVisual.add(modelPivot);
     },
     undefined,
     (error) => {
@@ -160,11 +175,11 @@ export function createPlayer() {
       shipVisual.scale.setScalar(1 + glowPulse * 0.05);
       glowCore.rotation.x = elapsed * 4;
       glowCore.rotation.y = elapsed * 3;
-      glowMaterial.emissiveIntensity = 1.8 + glowPulse * 2.5;
-      glowCore.scale.setScalar(1 + glowPulse * 0.35);
+      glowMaterial.emissiveIntensity = 0.04 + glowPulse * 0.02;
+      glowCore.scale.setScalar(0.75 + glowPulse * 0.08);
 
       for (const entry of emissiveMaterials) {
-        entry.material.emissiveIntensity = entry.baseIntensity + glowPulse * 0.45;
+        entry.material.emissiveIntensity = Math.min(IMPORTED_EMISSIVE_MAX, entry.baseIntensity + glowPulse * 0.015);
       }
     }
   };

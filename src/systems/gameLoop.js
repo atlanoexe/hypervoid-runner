@@ -12,11 +12,26 @@ import {
   BASE_SPEED,
   LANE_LIMIT,
   MAX_SPEED,
+  PLAYER_FAIL_RADIUS,
+  PLAYER_SIGHT_RADIUS,
   PLAYER_Y,
   SPAWN_LOOKAHEAD,
   SPEED_SMOOTHING,
   VERTICAL_LIMIT
 } from '../core/constants.js';
+
+function clampToRadius(x, y, radius) {
+  const distance = Math.hypot(x, y);
+  if (distance <= radius || distance === 0) {
+    return { x, y };
+  }
+
+  const scale = radius / distance;
+  return {
+    x: x * scale,
+    y: y * scale
+  };
+}
 
 export function createGame(root, { onScore, onGameOver, onFeedback = () => {} }) {
   const engine = createEngine(root);
@@ -70,6 +85,14 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   }
 
   function checkCollisions() {
+    const playerDistance = Math.hypot(player.mesh.position.x, player.mesh.position.y);
+    if (playerDistance > PLAYER_FAIL_RADIUS) {
+      player.pulse(1.15);
+      engine.bump(0.95);
+      endGame();
+      return;
+    }
+
     for (const coin of coins.items) {
       if (!coin.active) continue;
       if (hitTest(player.mesh.position.x, player.mesh.position.y, coin)) {
@@ -125,19 +148,21 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
 
         const worldUnitsPerPixelX = (LANE_LIMIT * 2) / drag.width;
         const worldUnitsPerPixelY = (VERTICAL_LIMIT * 2) / drag.height;
-        targetX = clamp(dragAnchorX + drag.deltaX * worldUnitsPerPixelX, -LANE_LIMIT, LANE_LIMIT);
-        targetY = clamp(
+        const dragTarget = clampToRadius(
+          dragAnchorX + drag.deltaX * worldUnitsPerPixelX,
           dragAnchorY - drag.deltaY * worldUnitsPerPixelY,
-          PLAYER_Y - VERTICAL_LIMIT,
-          PLAYER_Y + VERTICAL_LIMIT
+          PLAYER_SIGHT_RADIUS
         );
+        targetX = dragTarget.x;
+        targetY = dragTarget.y;
       } else {
-        targetX = clamp(targetX + steer.x * dt * (10.5 + speed * 1.35), -LANE_LIMIT, LANE_LIMIT);
-        targetY = clamp(
+        const steerTarget = clampToRadius(
+          targetX + steer.x * dt * (10.5 + speed * 1.35),
           targetY + steer.y * dt * (8.1 + speed * 1.1),
-          PLAYER_Y - VERTICAL_LIMIT,
-          PLAYER_Y + VERTICAL_LIMIT
+          PLAYER_SIGHT_RADIUS
         );
+        targetX = steerTarget.x;
+        targetY = steerTarget.y;
       }
 
       const motionX = clamp((targetX - player.mesh.position.x) / 1.1, -1, 1);
