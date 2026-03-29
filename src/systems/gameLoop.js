@@ -56,15 +56,18 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   const clock = new THREE.Clock();
 
   function ready() {
-    return Promise.all([playerVisual.ready(), preloadCoinModel()]).then(([playerOk, coinOk]) => playerOk && coinOk);
+    return Promise.all([playerVisual.ready(), preloadCoinModel(), audio.ready()]).then(
+      ([playerOk, coinOk, audioOk]) => playerOk && coinOk && audioOk
+    );
   }
 
   function onLoadProgress(callback) {
     let playerProgress = 0;
     let coinProgress = isCoinModelLoaded() ? 1 : 0;
+    let audioProgress = 0;
 
     const emitCombinedProgress = () => {
-      callback((playerProgress + coinProgress) / 2);
+      callback((playerProgress + coinProgress + audioProgress) / 3);
     };
 
     const stopPlayerProgress = playerVisual.onLoadProgress((progress) => {
@@ -77,11 +80,17 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       emitCombinedProgress();
     });
 
+    const stopAudioProgress = audio.onLoadProgress((progress) => {
+      audioProgress = progress;
+      emitCombinedProgress();
+    });
+
     emitCombinedProgress();
 
     return () => {
       stopPlayerProgress();
       stopCoinProgress();
+      stopAudioProgress();
     };
   }
 
@@ -114,6 +123,8 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       }
 
       if (event.type === 'gameOver') {
+        audio.stopBackground();
+        audio.playHit();
         onGameOver(getGameOverState());
       }
     }
@@ -165,6 +176,8 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       beginRun(nextName);
       input.reset();
       itemRender.reset();
+      audio.unlock();
+      audio.startBackground();
       onScore(getHudState());
     },
     stop() {

@@ -30,17 +30,25 @@ const game = createGame(app, {
 
 const initialName = loadUsername() ?? '';
 homeScreen.setName(initialName);
-homeScreen.show();
+loadingScreen.show();
 
 async function launchRun(username) {
   if (launchingRun) return;
   launchingRun = true;
-  loadingScreen.setProgress(0);
-  loadingScreen.show();
   hud.hide();
   scoreScreen.hide();
   homeScreen.hide();
 
+  try {
+    hud.show();
+    game.start(username);
+  } finally {
+    launchingRun = false;
+  }
+}
+
+async function bootstrap() {
+  loadingScreen.setProgress(0);
   const stopProgress = game.onLoadProgress((progress) => {
     loadingScreen.setProgress(progress);
   });
@@ -48,12 +56,10 @@ async function launchRun(username) {
   try {
     await game.ready();
     loadingScreen.setProgress(1);
-    loadingScreen.hide();
-    hud.show();
-    game.start(username);
   } finally {
     stopProgress();
-    launchingRun = false;
+    loadingScreen.hide();
+    homeScreen.show();
   }
 }
 
@@ -68,3 +74,5 @@ scoreScreen.onReturnHome(() => {
   homeScreen.setName(currentUsername);
   homeScreen.show();
 });
+
+bootstrap();

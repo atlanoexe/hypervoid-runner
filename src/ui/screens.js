@@ -96,8 +96,8 @@ export function createScoreScreen(root) {
 
 export function createLoadingScreen(root) {
   const panel = cardTemplate(
-    'Loading Assets',
-    '<p class="lede">Game assets loading...</p><div class="loading-stack"><div class="progress-shell"><div id="progress-fill" class="progress-fill"></div></div><p id="progress-text" class="progress-text">0%</p></div>'
+    'Preparing Hypervoid',
+    '<p class="lede">Loading models, audio, and core game files...</p><div class="loading-stack"><div class="progress-shell"><div id="progress-fill" class="progress-fill"></div></div><p id="progress-text" class="progress-text">0%</p></div>'
   );
   root.appendChild(panel);
 
