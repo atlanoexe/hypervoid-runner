@@ -15,7 +15,7 @@ function cardTemplate(title, bodyHtml) {
 export function createStartScreen(root) {
   const panel = cardTemplate(
     'Hypervoid Runner',
-    '<p class="lede">Thread the digital tunnel, collect K coins, and dodge shifting hazards.</p><label class="field"><span>Pilot</span><input id="name" maxlength="24" placeholder="Enter username" /></label><div class="hint-list"><span>Desktop: A / D / W / S or Arrow Keys</span><span>Mobile: drag in any direction to steer</span></div><button id="start">Launch Run</button>'
+    '<p class="lede">Thread the digital tunnel, collect K coins, and dodge shifting hazards.</p><label class="field"><span>Pilot</span><input id="name" maxlength="24" placeholder="Enter username" /></label><div class="hint-list"><span>Desktop: A / D / W / S or Arrow Keys</span><span>Mobile: drag in any direction for direct movement</span></div><button id="start">Launch Run</button>'
   );
   root.appendChild(panel);
 

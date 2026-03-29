@@ -1,51 +1,53 @@
-import { clamp, lerp } from '../utils/math.js';
-
 export function createInput(surface) {
   const pressed = new Set();
   let pointerId = null;
-  let touchAxisX = 0;
-  let touchAxisY = 0;
-  let lastPointerX = 0;
-  let lastPointerY = 0;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragCurrentX = 0;
+  let dragCurrentY = 0;
+  let dragStarted = false;
 
   const steerKeys = new Set(['a', 'd', 'w', 's', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown']);
   surface.style.touchAction = 'none';
 
+  function isEditableTarget(target) {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+  }
+
   const onKeyDown = (e) => {
     const key = e.key.toLowerCase();
+    if (isEditableTarget(e.target)) return;
     if (steerKeys.has(key)) e.preventDefault();
     pressed.add(key);
   };
 
   const onKeyUp = (e) => {
+    if (isEditableTarget(e.target)) return;
     pressed.delete(e.key.toLowerCase());
   };
 
   const onPointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     pointerId = e.pointerId;
-    lastPointerX = e.clientX;
-    lastPointerY = e.clientY;
-    touchAxisX = 0;
-    touchAxisY = 0;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragCurrentX = e.clientX;
+    dragCurrentY = e.clientY;
+    dragStarted = true;
     surface.setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (e) => {
     if (e.pointerId !== pointerId) return;
-    const width = Math.max(window.innerWidth, 1);
-    const height = Math.max(window.innerHeight, 1);
-    const deltaX = (e.clientX - lastPointerX) / width;
-    const deltaY = (e.clientY - lastPointerY) / height;
-    lastPointerX = e.clientX;
-    lastPointerY = e.clientY;
-    touchAxisX = clamp(touchAxisX + deltaX * 10, -1, 1);
-    touchAxisY = clamp(touchAxisY - deltaY * 10, -1, 1);
+    dragCurrentX = e.clientX;
+    dragCurrentY = e.clientY;
   };
 
   const releasePointer = (e) => {
     if (e.pointerId !== pointerId) return;
     pointerId = null;
+    dragStarted = false;
   };
 
   window.addEventListener('keydown', onKeyDown);
@@ -56,12 +58,7 @@ export function createInput(surface) {
   surface.addEventListener('pointercancel', releasePointer);
 
   return {
-    update(dt) {
-      if (pointerId === null) {
-        touchAxisX = lerp(touchAxisX, 0, Math.min(1, dt * 7));
-        touchAxisY = lerp(touchAxisY, 0, Math.min(1, dt * 7));
-      }
-    },
+    update() {},
     axes() {
       const left = pressed.has('a') || pressed.has('arrowleft');
       const right = pressed.has('d') || pressed.has('arrowright');
@@ -70,17 +67,33 @@ export function createInput(surface) {
       const keyAxisX = Number(right) - Number(left);
       const keyAxisY = Number(up) - Number(down);
       return {
-        x: keyAxisX !== 0 ? keyAxisX : touchAxisX,
-        y: keyAxisY !== 0 ? keyAxisY : touchAxisY
+        x: keyAxisX,
+        y: keyAxisY
       };
+    },
+    drag() {
+      const viewport = window.visualViewport;
+      const width = Math.max(1, Math.round(viewport?.width ?? window.innerWidth));
+      const height = Math.max(1, Math.round(viewport?.height ?? window.innerHeight));
+      const snapshot = {
+        active: pointerId !== null,
+        started: dragStarted,
+        deltaX: dragCurrentX - dragStartX,
+        deltaY: dragCurrentY - dragStartY,
+        width,
+        height
+      };
+      dragStarted = false;
+      return snapshot;
     },
     reset() {
       pressed.clear();
       pointerId = null;
-      touchAxisX = 0;
-      touchAxisY = 0;
-      lastPointerX = 0;
-      lastPointerY = 0;
+      dragStartX = 0;
+      dragStartY = 0;
+      dragCurrentX = 0;
+      dragCurrentY = 0;
+      dragStarted = false;
     },
     dispose() {
       window.removeEventListener('keydown', onKeyDown);

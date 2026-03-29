@@ -38,6 +38,8 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   let targetSpeed = BASE_SPEED;
   let targetX = 0;
   let targetY = PLAYER_Y;
+  let dragAnchorX = 0;
+  let dragAnchorY = PLAYER_Y;
   let coinSpawnZ = -26;
   let obstacleSpawnZ = -18;
 
@@ -107,6 +109,7 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       const live = score.snapshot();
       const difficulty = difficultyFor(live.time);
       const steer = input.axes();
+      const drag = input.drag();
 
       // Speed and spawn pressure rise together, but lerp keeps the ramp readable.
       targetSpeed = Math.min(MAX_SPEED, BASE_SPEED + live.time * (0.04 + difficulty * 0.02));
@@ -114,10 +117,35 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       coinSpawnZ += speed * coins.travelRate;
       obstacleSpawnZ += speed * obstacles.travelRate;
 
-      targetX = clamp(targetX + steer.x * dt * (10.5 + speed * 1.35), -LANE_LIMIT, LANE_LIMIT);
-      targetY = clamp(targetY + steer.y * dt * (8.1 + speed * 1.1), PLAYER_Y - VERTICAL_LIMIT, PLAYER_Y + VERTICAL_LIMIT);
-      player.mesh.position.x = lerp(player.mesh.position.x, targetX, Math.min(1, dt * (8.3 + speed)));
-      player.mesh.position.y = lerp(player.mesh.position.y, targetY, Math.min(1, dt * (7.6 + speed)));
+      if (drag.active) {
+        if (drag.started) {
+          dragAnchorX = targetX;
+          dragAnchorY = targetY;
+        }
+
+        const worldUnitsPerPixelX = (LANE_LIMIT * 2) / drag.width;
+        const worldUnitsPerPixelY = (VERTICAL_LIMIT * 2) / drag.height;
+        targetX = clamp(dragAnchorX + drag.deltaX * worldUnitsPerPixelX, -LANE_LIMIT, LANE_LIMIT);
+        targetY = clamp(
+          dragAnchorY - drag.deltaY * worldUnitsPerPixelY,
+          PLAYER_Y - VERTICAL_LIMIT,
+          PLAYER_Y + VERTICAL_LIMIT
+        );
+      } else {
+        targetX = clamp(targetX + steer.x * dt * (10.5 + speed * 1.35), -LANE_LIMIT, LANE_LIMIT);
+        targetY = clamp(
+          targetY + steer.y * dt * (8.1 + speed * 1.1),
+          PLAYER_Y - VERTICAL_LIMIT,
+          PLAYER_Y + VERTICAL_LIMIT
+        );
+      }
+
+      const motionX = clamp((targetX - player.mesh.position.x) / 1.1, -1, 1);
+      const motionY = clamp((targetY - player.mesh.position.y) / 0.85, -1, 1);
+      const horizontalFollow = drag.active ? 1 : Math.min(1, dt * (8.3 + speed));
+      const verticalFollow = drag.active ? 1 : Math.min(1, dt * (7.6 + speed));
+      player.mesh.position.x = lerp(player.mesh.position.x, targetX, horizontalFollow);
+      player.mesh.position.y = lerp(player.mesh.position.y, targetY, verticalFollow);
 
       updateSpawns(difficulty);
       coins.update(dt, speed, difficulty);
@@ -125,12 +153,13 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
 
       wormhole.update(speed, elapsed, difficulty);
       particles.update(dt, speed, difficulty);
-      player.update(elapsed, steer.x, steer.y, speed, dt, targetY);
+      player.update(elapsed, motionX, motionY, speed, dt, targetY);
       checkCollisions();
-      engine.update(dt, elapsed, speed, player.mesh.position.x, player.mesh.position.y, steer.x, steer.y);
+      engine.update(dt, elapsed, speed, player.mesh.position.x, player.mesh.position.y, motionX, motionY);
 
       if (running) onScore({ ...score.snapshot(), username, speed });
     } else {
+      input.drag();
       wormhole.update(BASE_SPEED, elapsed, 0.08);
       particles.update(dt, BASE_SPEED, 0.08);
       player.update(elapsed, 0, 0, BASE_SPEED, dt, targetY);
@@ -150,6 +179,8 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       targetSpeed = BASE_SPEED;
       targetX = 0;
       targetY = PLAYER_Y;
+      dragAnchorX = 0;
+      dragAnchorY = PLAYER_Y;
       player.mesh.position.x = 0;
       player.mesh.position.y = PLAYER_Y;
       coinSpawnZ = -26;

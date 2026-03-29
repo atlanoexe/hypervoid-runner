@@ -5,22 +5,33 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { lerp } from '../utils/math.js';
 
 export function createEngine(container) {
+  function getViewportSize() {
+    const rect = container.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const width = Math.max(1, Math.round(rect.width || viewport?.width || window.innerWidth));
+    const height = Math.max(1, Math.round(rect.height || viewport?.height || window.innerHeight));
+    return { width, height };
+  }
+
+  const initialViewport = getViewportSize();
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x03050f, 30, 180);
 
-  const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 500);
+  const camera = new THREE.PerspectiveCamera(65, initialViewport.width / initialViewport.height, 0.1, 500);
   camera.position.set(0, 0, 11);
   const baseCamera = camera.position.clone();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(initialViewport.width, initialViewport.height, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
   container.appendChild(renderer.domElement);
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.4, 0.75);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(initialViewport.width, initialViewport.height), 0.8, 0.4, 0.75);
   composer.addPass(bloom);
 
   const ambient = new THREE.AmbientLight(0x84b4ff, 0.7);
@@ -34,15 +45,21 @@ export function createEngine(container) {
   let pitch = 0;
   let shake = 0;
   let pulse = 0;
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
 
   function onResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const viewport = getViewportSize();
+    camera.aspect = viewport.width / viewport.height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(viewport.width, viewport.height, false);
+    composer.setSize(viewport.width, viewport.height);
+    bloom.resolution.set(viewport.width, viewport.height);
   }
 
   window.addEventListener('resize', onResize);
+  window.visualViewport?.addEventListener('resize', onResize);
+  resizeObserver?.observe(container);
 
   return {
     scene,
@@ -77,6 +94,8 @@ export function createEngine(container) {
     },
     dispose() {
       window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+      resizeObserver?.disconnect();
       renderer.dispose();
     }
   };
