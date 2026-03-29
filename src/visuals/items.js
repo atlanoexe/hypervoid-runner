@@ -1,137 +1,187 @@
 import * as THREE from 'three';
-import { ITEM_SCALE, MAX_POOL_ITEMS, PLAYER_Y, VERTICAL_LIMIT } from '../core/constants.js';
-import { lerp, randInRange } from '../utils/math.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ITEM_SCALE } from '../core/constants.js';
 
-function spawnX() {
-  return randInRange(-6.5, 6.5);
+const COIN_MODEL_URL = '/models/coins/base_basic_shaded.glb';
+const COIN_MODEL_SIZE = 1.45;
+
+let coinPrototypePromise = null;
+let coinReadyPromise = null;
+let coinLoaded = false;
+let coinProgress = 0;
+const coinProgressListeners = new Set();
+
+const coinLoadingManager = new THREE.LoadingManager();
+const coinLoader = new GLTFLoader(coinLoadingManager);
+
+function emitCoinProgress(nextProgress) {
+  coinProgress = Math.max(coinProgress, Math.min(1, nextProgress));
+
+  for (const listener of coinProgressListeners) {
+    listener(coinProgress);
+  }
 }
 
-function spawnY() {
-  return randInRange(PLAYER_Y - VERTICAL_LIMIT, PLAYER_Y + VERTICAL_LIMIT);
+function collectMaterialEntries(root, target) {
+  root.traverse((node) => {
+    if (!node.isMesh) return;
+
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (!material) continue;
+
+      target.push({
+        material,
+        baseEmissive: 'emissiveIntensity' in material ? material.emissiveIntensity ?? 0 : 0,
+        baseOpacity: 'opacity' in material ? material.opacity ?? 1 : 1,
+        baseTransparent: Boolean(material.transparent)
+      });
+    }
+  });
 }
 
-export function createItemSystem({ color, emissive, isCoin }) {
-  const group = new THREE.Group();
-  const items = [];
-  const baseEmissive = isCoin ? 1.3 : 0.6;
-  const radius = (isCoin ? 0.6 : 0.95) * ITEM_SCALE;
-  const travelRate = isCoin ? 0.36 : 0.4;
+function normalizeImportedModel(root, targetSize) {
+  const box = new THREE.Box3().setFromObject(root);
+  const center = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
 
-  const geometry = isCoin
-    ? new THREE.TorusGeometry(0.55, 0.19, 8, 18)
-    : new THREE.IcosahedronGeometry(0.92, 0);
+  root.position.sub(center);
 
-  for (let i = 0; i < MAX_POOL_ITEMS; i++) {
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      emissive,
-      emissiveIntensity: baseEmissive,
-      metalness: isCoin ? 0.45 : 0.18,
+  const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+  const scale = targetSize / maxDimension;
+  root.scale.setScalar(scale);
+  return root;
+}
+
+function cloneSceneWithMaterials(root) {
+  const clone = root.clone(true);
+  clone.traverse((node) => {
+    if (!node.isMesh) return;
+
+    if (Array.isArray(node.material)) {
+      node.material = node.material.map((material) => material?.clone?.() ?? material);
+    } else if (node.material?.clone) {
+      node.material = node.material.clone();
+    }
+  });
+  return clone;
+}
+
+function loadCoinPrototype() {
+  if (!coinPrototypePromise) {
+    coinLoadingManager.onStart = () => emitCoinProgress(0.05);
+    coinLoadingManager.onProgress = (_, loaded, total) => {
+      if (!total) return;
+      emitCoinProgress(loaded / total);
+    };
+    coinLoadingManager.onLoad = () => emitCoinProgress(1);
+
+    coinPrototypePromise = coinLoader
+      .loadAsync(COIN_MODEL_URL)
+      .then((gltf) => {
+        coinLoaded = true;
+        emitCoinProgress(1);
+        return normalizeImportedModel(gltf.scene, COIN_MODEL_SIZE);
+      })
+      .catch((error) => {
+        console.error('Failed to load coin model:', error);
+        emitCoinProgress(1);
+        return null;
+      });
+  }
+
+  return coinPrototypePromise;
+}
+
+export function preloadCoinModel() {
+  if (!coinReadyPromise) {
+    coinReadyPromise = loadCoinPrototype().then((prototype) => Boolean(prototype));
+  }
+
+  return coinReadyPromise;
+}
+
+export function onCoinModelLoadProgress(callback) {
+  coinProgressListeners.add(callback);
+  callback(coinProgress);
+  return () => coinProgressListeners.delete(callback);
+}
+
+export function isCoinModelLoaded() {
+  return coinLoaded;
+}
+
+function createFallbackCoinVisual() {
+  return new THREE.Mesh(
+    new THREE.TorusGeometry(0.55, 0.19, 8, 18),
+    new THREE.MeshStandardMaterial({
+      color: 0xffdc67,
+      emissive: 0xd19a00,
+      emissiveIntensity: 1.3,
+      metalness: 0.45,
       roughness: 0.35,
-      transparent: isCoin
-    });
+      transparent: true
+    })
+  );
+}
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.visible = false;
-    group.add(mesh);
-    items.push({
-      mesh,
-      active: false,
-      z: -100,
-      burst: 0,
-      baseScale: 1,
-      baseEmissive,
-      nearMissed: false,
-      radius
-    });
-  }
+export function createCoinMesh() {
+  const coin = new THREE.Group();
+  const fallback = createFallbackCoinVisual();
+  const materialEntries = [];
 
-  function hideItem(item) {
-    item.active = false;
-    item.burst = 0;
-    item.nearMissed = false;
-    item.mesh.visible = false;
-    item.mesh.material.opacity = 1;
-    item.mesh.material.emissiveIntensity = item.baseEmissive;
-    item.mesh.scale.setScalar(item.baseScale || 1);
-  }
+  coin.add(fallback);
+  collectMaterialEntries(fallback, materialEntries);
 
-  function spawnBatch(baseZ, density) {
-    const count = isCoin
-      ? 2 + Math.floor(Math.random() * (2 + Math.round(density * 2)))
-      : 1 + Math.floor(Math.random() * (1 + Math.round(density * 2)));
+  coin.visible = false;
+  coin.userData.itemScale = ITEM_SCALE;
+  coin.userData.materialEntries = materialEntries;
 
-    for (let i = 0; i < count; i++) {
-      const slot = items.find((it) => !it.active && it.burst <= 0);
-      if (!slot) return;
+  loadCoinPrototype().then((prototype) => {
+    if (!prototype) return;
 
-      const scale = isCoin ? randInRange(0.92, 1.18) : randInRange(0.88, 1.22);
-      slot.active = true;
-      slot.burst = 0;
-      slot.nearMissed = false;
-      slot.baseScale = scale * ITEM_SCALE;
-      slot.radius = radius * scale;
-      slot.z = baseZ - i * randInRange(isCoin ? 3.5 : 4.8, isCoin ? 8.5 : 10.8);
-      slot.mesh.visible = true;
-      slot.mesh.material.opacity = 1;
-      slot.mesh.material.emissiveIntensity = slot.baseEmissive;
-      slot.mesh.position.set(spawnX(), spawnY(), slot.z);
-      slot.mesh.rotation.set(randInRange(0, Math.PI), randInRange(0, Math.PI), randInRange(0, Math.PI));
-      slot.mesh.scale.setScalar(slot.baseScale);
+    const importedCoin = cloneSceneWithMaterials(prototype);
+    const importedEntries = [];
+    collectMaterialEntries(importedCoin, importedEntries);
+
+    coin.clear();
+    coin.add(importedCoin);
+    coin.userData.materialEntries = importedEntries;
+  });
+
+  return coin;
+}
+
+export function createObstacleMesh() {
+  const mesh = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.92, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0xf24a89,
+      emissive: 0x7d0c34,
+      emissiveIntensity: 0.6,
+      metalness: 0.18,
+      roughness: 0.35
+    })
+  );
+
+  mesh.visible = false;
+  mesh.userData.itemScale = ITEM_SCALE;
+  mesh.userData.materialEntries = [
+    {
+      material: mesh.material,
+      baseEmissive: mesh.material.emissiveIntensity ?? 0,
+      baseOpacity: mesh.material.opacity ?? 1,
+      baseTransparent: Boolean(mesh.material.transparent)
     }
+  ];
+  return mesh;
+}
+
+export function forEachItemMaterial(item, iteratee) {
+  const materialEntries = item.userData.materialEntries ?? [];
+  for (const entry of materialEntries) {
+    iteratee(entry);
   }
-
-  return {
-    group,
-    items,
-    travelRate,
-    reset() {
-      for (const item of items) hideItem(item);
-    },
-    collect(item) {
-      if (!isCoin || !item.active) return;
-      item.active = false;
-      item.burst = 0.18;
-      item.mesh.material.emissiveIntensity = item.baseEmissive * 2.6;
-    },
-    spawnAhead(lastSpawnZ, density = 0) {
-      const minGap = isCoin ? lerp(18, 9, density) : lerp(22, 12, density);
-      const maxGap = isCoin ? lerp(30, 17, density) : lerp(32, 19, density);
-      const nextZ = lastSpawnZ - randInRange(minGap, maxGap);
-      spawnBatch(nextZ, density);
-      return nextZ;
-    },
-    update(dt, speed, density = 0) {
-      for (const item of items) {
-        if (item.active) {
-          item.z += speed * travelRate;
-          item.mesh.position.z = item.z;
-          item.mesh.rotation.x += dt * (isCoin ? 4.2 : 3.4);
-          item.mesh.rotation.y += dt * (isCoin ? 5.2 : 3.8);
-
-          if (isCoin) {
-            item.mesh.material.emissiveIntensity = item.baseEmissive + Math.sin(item.z * 0.35) * 0.12 + density * 0.4;
-          }
-
-          if (item.z > 14) hideItem(item);
-          continue;
-        }
-
-        if (item.burst > 0) {
-          item.burst = Math.max(0, item.burst - dt);
-          const progress = 1 - item.burst / 0.18;
-          item.mesh.visible = true;
-          item.mesh.scale.setScalar(item.baseScale * (1 + progress * 1.35));
-          item.mesh.material.opacity = 1 - progress;
-          item.mesh.material.emissiveIntensity = item.baseEmissive * (2.2 - progress * 0.6);
-          item.mesh.rotation.y += dt * 8.5;
-          item.mesh.rotation.z += dt * 3.8;
-
-          if (item.burst <= 0) {
-            hideItem(item);
-          }
-        }
-      }
-    }
-  };
 }

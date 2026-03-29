@@ -1,13 +1,19 @@
 import { createGame } from './systems/gameLoop.js';
-import { createStartScreen, createGameOverScreen, createHud, createFeedbackLayer, createLoadingScreen } from './ui/screens.js';
+import {
+  createHomeScreen,
+  createScoreScreen,
+  createHud,
+  createFeedbackLayer,
+  createLoadingScreen
+} from './ui/screens.js';
 import { loadUsername, saveUsername } from './utils/storage.js';
 
 const app = document.getElementById('app');
 
 const hud = createHud(app);
 const feedback = createFeedbackLayer(app);
-const startScreen = createStartScreen(app);
-const gameOverScreen = createGameOverScreen(app);
+const homeScreen = createHomeScreen(app);
+const scoreScreen = createScoreScreen(app);
 const loadingScreen = createLoadingScreen(app);
 let currentUsername = 'Pilot';
 let launchingRun = false;
@@ -15,16 +21,16 @@ let launchingRun = false;
 const game = createGame(app, {
   onScore: (state) => hud.update(state),
   onFeedback: (kind) => feedback.pulse(kind),
-  onGameOver: ({ score, coins, time, username }) => {
+  onGameOver: ({ score, coins, time, username, combo, bestCombo }) => {
     currentUsername = username;
     hud.hide();
-    gameOverScreen.show({ username, score, coins, time });
+    scoreScreen.show({ username, score, coins, time, combo, bestCombo });
   }
 });
 
 const initialName = loadUsername() ?? '';
-startScreen.setName(initialName);
-startScreen.show();
+homeScreen.setName(initialName);
+homeScreen.show();
 
 async function launchRun(username) {
   if (launchingRun) return;
@@ -32,6 +38,8 @@ async function launchRun(username) {
   loadingScreen.setProgress(0);
   loadingScreen.show();
   hud.hide();
+  scoreScreen.hide();
+  homeScreen.hide();
 
   const stopProgress = game.onLoadProgress((progress) => {
     loadingScreen.setProgress(progress);
@@ -49,16 +57,14 @@ async function launchRun(username) {
   }
 }
 
-startScreen.onStart(async (username) => {
+homeScreen.onStart(async (username) => {
   currentUsername = username;
   saveUsername(username);
-  gameOverScreen.hide();
-  startScreen.hide();
   await launchRun(username);
 });
 
-gameOverScreen.onRestart(async () => {
-  gameOverScreen.hide();
-  startScreen.hide();
-  await launchRun(currentUsername);
+scoreScreen.onReturnHome(() => {
+  scoreScreen.hide();
+  homeScreen.setName(currentUsername);
+  homeScreen.show();
 });

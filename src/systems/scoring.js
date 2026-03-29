@@ -1,36 +1,50 @@
-import { SCORE_TIME_DIVISOR } from '../core/constants.js';
+import { enqueueEvent, GameState } from '../core/state.js';
 
-export function createScoring() {
-  let coins = 0;
-  let startedAt = performance.now();
-  let storedTime = 0;
-  let running = false;
+const COMBO_STEP = 0.08;
+const MAX_COMBO_STEPS = 12;
 
-  const measureSeconds = () => (running ? (performance.now() - startedAt) * 0.001 : storedTime);
-  // Keep score derived from live inputs instead of storing a mutable total.
-  const weaveScore = (seconds) => Math.round(coins * Math.exp(seconds / SCORE_TIME_DIVISOR));
+function comboMultiplier() {
+  return 1 + Math.min(GameState.run.combo, MAX_COMBO_STEPS) * COMBO_STEP;
+}
 
-  return {
-    start() {
-      coins = 0;
-      storedTime = 0;
-      startedAt = performance.now();
-      running = true;
-    },
-    stop() {
-      storedTime = measureSeconds();
-      running = false;
-    },
-    add(value = 1) {
-      coins += value;
-    },
-    snapshot() {
-      const time = measureSeconds();
-      return {
-        coins,
-        time,
-        score: coins > 0 ? weaveScore(time) : 0
-      };
-    }
-  };
+function recalculateScore() {
+  const { coins, time } = GameState.run;
+
+  if (coins <= 0) {
+    GameState.run.score = 0;
+    return;
+  }
+
+  GameState.run.score = Math.round(
+    Math.pow(coins, 1.2) * Math.exp(time / 25) * comboMultiplier()
+  );
+}
+
+export function onCoinCollected() {
+  if (!GameState.run.active) return;
+  GameState.run.coins += 1;
+  GameState.run.combo += 1;
+  GameState.run.bestCombo = Math.max(GameState.run.bestCombo, GameState.run.combo);
+  recalculateScore();
+  enqueueEvent('coinCollected', { combo: GameState.run.combo });
+}
+
+export function onNearMiss() {
+  if (!GameState.run.active) return;
+  GameState.run.combo += 1;
+  GameState.run.bestCombo = Math.max(GameState.run.bestCombo, GameState.run.combo);
+  recalculateScore();
+  enqueueEvent('nearMiss', { combo: GameState.run.combo });
+}
+
+export function onComboBreak() {
+  GameState.run.combo = 0;
+  recalculateScore();
+  enqueueEvent('comboBreak');
+}
+
+export function scoringSystem(dt) {
+  if (!GameState.run.active) return;
+  GameState.run.time += dt;
+  recalculateScore();
 }

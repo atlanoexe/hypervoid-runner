@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PLAYER_SCALE, PLAYER_Y, PLAYER_Z } from '../core/constants.js';
-import { lerp } from '../utils/math.js';
 
 const PLAYER_MODEL_URL = '/models/mirage/Miragej.gltf';
 const PLAYER_MODEL_SIZE = 3.4;
@@ -47,7 +46,6 @@ function createCenteredPivot(root) {
   const maxDimension = Math.max(size.x, size.y, size.z) || 1;
   const scale = PLAYER_MODEL_SIZE / maxDimension;
   pivot.scale.setScalar(scale);
-
   return pivot;
 }
 
@@ -101,7 +99,7 @@ function createFallbackShip() {
   };
 }
 
-export function createPlayer() {
+export function createPlayerVisual() {
   const group = new THREE.Group();
   const shipVisual = new THREE.Group();
   const progressListeners = new Set();
@@ -109,6 +107,7 @@ export function createPlayer() {
   let resolveReady = null;
   let currentProgress = 0;
   let hasLoadedMirage = false;
+
   const ready = new Promise((resolve) => {
     resolveReady = resolve;
   });
@@ -176,13 +175,12 @@ export function createPlayer() {
   group.position.set(0, PLAYER_Y, PLAYER_Z);
   group.scale.setScalar(PLAYER_SCALE);
 
-  let bank = 0;
-  let pitch = 0.12;
-  let yaw = 0;
-  let glowPulse = 0;
-
   return {
     mesh: group,
+    shipVisual,
+    glowCore,
+    glowMaterial,
+    emissiveMaterials,
     ready() {
       return ready;
     },
@@ -193,34 +191,6 @@ export function createPlayer() {
       progressListeners.add(callback);
       callback(currentProgress);
       return () => progressListeners.delete(callback);
-    },
-    pulse(amount = 0.6) {
-      glowPulse = Math.min(1.6, glowPulse + amount);
-    },
-    update(elapsed, steerX, steerY, speed, dt, targetY = PLAYER_Y) {
-      bank = lerp(bank, -steerX * 0.58, Math.min(1, dt * 8));
-      pitch = lerp(
-        pitch,
-        0.12 + Math.min(0.18, (speed - 1) * 0.045) + steerY * 0.22,
-        Math.min(1, dt * 4)
-      );
-      yaw = lerp(yaw, steerX * 0.14, Math.min(1, dt * 5));
-      glowPulse = Math.max(0, glowPulse - dt * 2.6);
-
-      group.rotation.z = bank;
-      group.rotation.y = yaw;
-      group.rotation.x = pitch + Math.sin(elapsed * 5.2) * 0.025;
-      group.position.y = targetY + Math.sin(elapsed * 3.8) * 0.08;
-
-      shipVisual.scale.setScalar(1 + glowPulse * 0.05);
-      glowCore.rotation.x = elapsed * 4;
-      glowCore.rotation.y = elapsed * 3;
-      glowMaterial.emissiveIntensity = 0.04 + glowPulse * 0.02;
-      glowCore.scale.setScalar(0.75 + glowPulse * 0.08);
-
-      for (const entry of emissiveMaterials) {
-        entry.material.emissiveIntensity = Math.min(IMPORTED_EMISSIVE_MAX, entry.baseIntensity + glowPulse * 0.015);
-      }
     }
   };
 }

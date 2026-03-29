@@ -7,6 +7,12 @@
     <style>
       :root {
         color-scheme: dark;
+        --panel-pad: clamp(14px, 4vw, 28px);
+        --card-width: min(94vw, 420px);
+        --card-radius: clamp(18px, 4vw, 22px);
+        --card-pad: clamp(16px, 4vw, 24px);
+        --field-pad-y: clamp(12px, 3.4vw, 14px);
+        --field-pad-x: clamp(12px, 3.6vw, 14px);
       }
       html, body {
         width: 100%;
@@ -55,28 +61,46 @@
         inset: 0;
         display: grid;
         place-items: center;
-        padding: 20px;
+        padding:
+          max(var(--panel-pad), env(safe-area-inset-top))
+          max(var(--panel-pad), env(safe-area-inset-right))
+          max(var(--panel-pad), env(safe-area-inset-bottom))
+          max(var(--panel-pad), env(safe-area-inset-left));
         background: linear-gradient(180deg, rgba(2, 5, 12, 0.4), rgba(2, 5, 12, 0.78));
         backdrop-filter: blur(14px);
         z-index: 20;
+        overflow: auto;
+        overscroll-behavior: contain;
       }
       .card {
-        width: min(92vw, 420px);
+        width: var(--card-width);
+        max-height: min(100%, 720px);
         border: 1px solid rgba(124, 221, 255, 0.22);
-        border-radius: 22px;
-        padding: 24px;
+        border-radius: var(--card-radius);
+        padding: var(--card-pad);
         background: linear-gradient(180deg, rgba(10, 18, 35, 0.98), rgba(6, 10, 22, 0.94));
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        overflow: auto;
+        box-sizing: border-box;
+      }
+      .panel-home .card {
+        width: min(96vw, 1120px);
+        max-height: min(100%, 780px);
+      }
+      .panel-score .card {
+        width: min(96vw, 980px);
       }
       h1, h2, p { margin: 0 0 12px; }
       h2 {
-        font-size: clamp(1.8rem, 4vw, 2.3rem);
+        font-size: clamp(1.5rem, 5vw, 2.3rem);
         letter-spacing: 0.06em;
         text-transform: uppercase;
+        line-height: 1.05;
       }
       .lede {
         color: rgba(214, 239, 248, 0.76);
         line-height: 1.6;
+        font-size: clamp(0.94rem, 3vw, 1rem);
       }
       .field {
         display: grid;
@@ -85,16 +109,101 @@
         color: rgba(178, 225, 238, 0.86);
         font-size: 0.95rem;
       }
+      .home-layout,
+      .score-layout {
+        display: grid;
+        gap: 16px;
+        margin-top: 18px;
+      }
+      .home-layout {
+        grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.8fr);
+        align-items: start;
+      }
+      .score-layout {
+        grid-template-columns: minmax(0, 0.8fr) minmax(300px, 1fr);
+        align-items: start;
+      }
+      .home-main,
+      .score-main {
+        min-width: 0;
+      }
+      .home-main {
+        display: grid;
+        gap: 0;
+      }
+      .intro-grid {
+        display: grid;
+        gap: 12px;
+        margin: 0 0 4px;
+      }
+      .intro-card {
+        display: grid;
+        grid-template-columns: 108px minmax(0, 1fr);
+        gap: 14px;
+        align-items: center;
+        padding: 12px;
+        border-radius: 18px;
+        border: 1px solid rgba(144, 227, 255, 0.14);
+        background: linear-gradient(180deg, rgba(125, 195, 255, 0.08), rgba(44, 82, 122, 0.08));
+      }
+      .intro-card-grab {
+        box-shadow: inset 0 1px 0 rgba(255, 228, 122, 0.12);
+      }
+      .intro-card-avoid {
+        box-shadow: inset 0 1px 0 rgba(255, 99, 153, 0.1);
+      }
+      .intro-preview {
+        aspect-ratio: 1;
+        width: 100%;
+        min-height: 96px;
+        border-radius: 16px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(120, 250, 255, 0.16), transparent 50%),
+          linear-gradient(180deg, rgba(7, 12, 28, 0.94), rgba(4, 7, 16, 0.98));
+        border: 1px solid rgba(139, 217, 255, 0.1);
+      }
+      .intro-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .intro-copy h3,
+      .intro-copy p {
+        margin: 0;
+      }
+      .intro-copy {
+        display: grid;
+        gap: 6px;
+      }
+      .intro-kicker {
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(181, 226, 239, 0.66);
+      }
+      .intro-copy h3 {
+        font-size: 1.02rem;
+        letter-spacing: 0.03em;
+      }
+      .intro-copy p {
+        color: rgba(214, 239, 248, 0.76);
+        line-height: 1.45;
+        font-size: 0.92rem;
+      }
       input, button {
         width: 100%;
         box-sizing: border-box;
         border-radius: 14px;
         border: 1px solid rgba(129, 213, 255, 0.22);
-        padding: 12px 14px;
+        padding: var(--field-pad-y) var(--field-pad-x);
         font: inherit;
         color: white;
         background: rgba(255,255,255,0.08);
         margin-top: 8px;
+      }
+      input {
+        min-height: 48px;
       }
       input:focus {
         outline: none;
@@ -114,11 +223,64 @@
         background: rgba(125, 195, 255, 0.08);
         border: 1px solid rgba(144, 227, 255, 0.12);
         color: rgba(225, 246, 255, 0.88);
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .results-emphasis p {
+        background: rgba(125, 195, 255, 0.1);
       }
       .results {
         display: grid;
         gap: 10px;
-        margin: 18px 0 6px;
+        margin: 0 0 6px;
+      }
+      .leaderboard-panel {
+        border-radius: 20px;
+        padding: 16px;
+        background: linear-gradient(180deg, rgba(8, 15, 31, 0.88), rgba(5, 9, 20, 0.92));
+        border: 1px solid rgba(124, 221, 255, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+      .leaderboard-head {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .leaderboard-kicker {
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(181, 226, 239, 0.66);
+      }
+      .leaderboard-head strong {
+        font-size: clamp(1rem, 2.5vw, 1.15rem);
+        letter-spacing: 0.03em;
+      }
+      .leaderboard-empty {
+        margin: 0 0 12px;
+        color: rgba(214, 239, 248, 0.72);
+        line-height: 1.55;
+        font-size: 0.94rem;
+      }
+      .leaderboard-placeholder {
+        display: grid;
+        gap: 10px;
+      }
+      .leaderboard-placeholder span {
+        height: 11px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(68, 115, 168, 0.28), rgba(130, 211, 255, 0.16));
+      }
+      .leaderboard-placeholder span:nth-child(1) { width: 88%; }
+      .leaderboard-placeholder span:nth-child(2) { width: 93%; }
+      .leaderboard-placeholder span:nth-child(3) { width: 81%; }
+      .leaderboard-placeholder span:nth-child(4) { width: 90%; }
+      .leaderboard-placeholder span:nth-child(5) { width: 76%; }
+      .leaderboard-placeholder-long span:nth-child(6) { width: 86%; }
+      .leaderboard-placeholder-long span:nth-child(7) { width: 91%; }
+      .leaderboard-placeholder-long span:nth-child(8) { width: 79%; }
+      .leaderboard-panel-preview {
+        min-height: 100%;
       }
       .loading-stack {
         display: grid;
@@ -158,6 +320,7 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         transition: transform 0.18s ease, box-shadow 0.18s ease;
+        min-height: 50px;
       }
       button:hover {
         transform: translateY(-1px);
@@ -167,7 +330,7 @@
         position: absolute;
         inset: 16px 16px auto 16px;
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 10px;
         z-index: 10;
         pointer-events: none;
@@ -193,6 +356,9 @@
         font-size: clamp(1rem, 2.8vw, 1.25rem);
         text-shadow: 0 2px 12px rgba(0,0,0,0.6);
       }
+      .hud-chip-combo .hud-value {
+        color: #9ff7ff;
+      }
       #feedback-layer {
         position: absolute;
         inset: 0;
@@ -217,14 +383,90 @@
         background: radial-gradient(circle at center, rgba(255, 70, 121, 0.14), transparent 50%);
       }
       .hidden { display: none; }
+      @media (max-width: 980px) {
+        .panel-home .card {
+          width: min(96vw, 760px);
+        }
+        .home-layout {
+          grid-template-columns: 1fr;
+        }
+      }
       @media (max-width: 720px) {
         #hud {
           inset: 12px 12px auto 12px;
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         .card {
-          width: min(94vw, 420px);
-          padding: 22px;
+          width: min(96vw, 420px);
+        }
+        .panel-score .card {
+          width: min(96vw, 720px);
+        }
+        .home-layout,
+        .score-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        :root {
+          --panel-pad: 12px;
+          --card-width: min(100%, 420px);
+          --card-pad: 14px;
+        }
+        .panel {
+          place-items: stretch;
+        }
+        .card {
+          align-self: center;
+          max-height: none;
+        }
+        h2 {
+          letter-spacing: 0.04em;
+        }
+        .field {
+          margin-top: 14px;
+        }
+        .hint-list,
+        .results,
+        .loading-stack {
+          gap: 8px;
+        }
+        .home-layout,
+        .score-layout {
+          gap: 12px;
+          margin-top: 14px;
+        }
+        .intro-card {
+          grid-template-columns: 84px minmax(0, 1fr);
+          gap: 10px;
+          padding: 10px;
+        }
+        .intro-preview {
+          min-height: 74px;
+        }
+        .leaderboard-panel {
+          padding: 14px;
+        }
+      }
+      @media (max-height: 740px) {
+        .panel {
+          place-items: start center;
+        }
+        .card {
+          margin-block: auto;
+        }
+      }
+      @media (max-height: 620px) {
+        :root {
+          --card-pad: 14px;
+        }
+        h2,
+        .lede {
+          margin-bottom: 10px;
+        }
+        .hint-list,
+        .results {
+          gap: 6px;
         }
       }
     </style>

@@ -1,3 +1,22 @@
+import { lerp } from '../utils/math.js';
+
+const InputSettings = {
+  dragSensitivity: 1.2,
+  keyboardSensitivity: 1.0,
+  deadzone: 0.05,
+  smoothing: 0.2
+};
+
+const USE_CENTER_CONTROL = false;
+
+function clampUnit(value) {
+  return Math.max(-1, Math.min(1, value));
+}
+
+function applyDeadzone(value) {
+  return Math.abs(value) < InputSettings.deadzone ? 0 : value;
+}
+
 export function createInput(surface) {
   const pressed = new Set();
   let pointerId = null;
@@ -6,6 +25,8 @@ export function createInput(surface) {
   let dragCurrentX = 0;
   let dragCurrentY = 0;
   let dragStarted = false;
+  let previousMoveX = 0;
+  let previousMoveY = 0;
 
   const steerKeys = new Set(['a', 'd', 'w', 's', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown']);
   surface.style.touchAction = 'none';
@@ -86,6 +107,39 @@ export function createInput(surface) {
       dragStarted = false;
       return snapshot;
     },
+    getMovement() {
+      const keyboard = this.axes();
+      const drag = this.drag();
+      const usingDrag = drag.active;
+      const sensitivity = usingDrag ? InputSettings.dragSensitivity : InputSettings.keyboardSensitivity;
+
+      let moveX = keyboard.x;
+      let moveY = keyboard.y;
+
+      if (usingDrag) {
+        if (USE_CENTER_CONTROL) {
+          moveX = (dragCurrentX - drag.width * 0.5) / drag.width;
+          moveY = (drag.height * 0.5 - dragCurrentY) / drag.height;
+        } else {
+          moveX = drag.deltaX / drag.width;
+          moveY = -drag.deltaY / drag.height;
+        }
+      }
+
+      moveX = applyDeadzone(clampUnit(moveX * sensitivity));
+      moveY = applyDeadzone(clampUnit(moveY * sensitivity));
+
+      previousMoveX = applyDeadzone(lerp(previousMoveX, moveX, InputSettings.smoothing));
+      previousMoveY = applyDeadzone(lerp(previousMoveY, moveY, InputSettings.smoothing));
+
+      return {
+        moveX: previousMoveX,
+        moveY: previousMoveY,
+        isSteering: previousMoveX !== 0 || previousMoveY !== 0,
+        dragActive: drag.active,
+        dragStarted: drag.started
+      };
+    },
     reset() {
       pressed.clear();
       pointerId = null;
@@ -94,6 +148,8 @@ export function createInput(surface) {
       dragCurrentX = 0;
       dragCurrentY = 0;
       dragStarted = false;
+      previousMoveX = 0;
+      previousMoveY = 0;
     },
     dispose() {
       window.removeEventListener('keydown', onKeyDown);
