@@ -1,16 +1,21 @@
 import * as THREE from 'three';
-import { MAX_POOL_ITEMS, PLAYER_Y } from '../core/constants.js';
+import { ITEM_SCALE, MAX_POOL_ITEMS, PLAYER_Y, VERTICAL_LIMIT } from '../core/constants.js';
 import { lerp, randInRange } from '../utils/math.js';
 
 function spawnX() {
   return randInRange(-6.5, 6.5);
 }
 
+function spawnY() {
+  return randInRange(PLAYER_Y - VERTICAL_LIMIT, PLAYER_Y + VERTICAL_LIMIT);
+}
+
 export function createItemSystem({ color, emissive, isCoin }) {
   const group = new THREE.Group();
   const items = [];
   const baseEmissive = isCoin ? 1.3 : 0.6;
-  const radius = isCoin ? 0.6 : 0.95;
+  const radius = (isCoin ? 0.6 : 0.95) * ITEM_SCALE;
+  const travelRate = isCoin ? 0.36 : 0.4;
 
   const geometry = isCoin
     ? new THREE.TorusGeometry(0.55, 0.19, 8, 18)
@@ -64,20 +69,22 @@ export function createItemSystem({ color, emissive, isCoin }) {
       slot.active = true;
       slot.burst = 0;
       slot.nearMissed = false;
-      slot.baseScale = scale;
+      slot.baseScale = scale * ITEM_SCALE;
+      slot.radius = radius * scale;
       slot.z = baseZ - i * randInRange(isCoin ? 3.5 : 4.8, isCoin ? 8.5 : 10.8);
       slot.mesh.visible = true;
       slot.mesh.material.opacity = 1;
       slot.mesh.material.emissiveIntensity = slot.baseEmissive;
-      slot.mesh.position.set(spawnX(), PLAYER_Y + randInRange(-0.35, 0.35), slot.z);
+      slot.mesh.position.set(spawnX(), spawnY(), slot.z);
       slot.mesh.rotation.set(randInRange(0, Math.PI), randInRange(0, Math.PI), randInRange(0, Math.PI));
-      slot.mesh.scale.setScalar(scale);
+      slot.mesh.scale.setScalar(slot.baseScale);
     }
   }
 
   return {
     group,
     items,
+    travelRate,
     reset() {
       for (const item of items) hideItem(item);
     },
@@ -97,7 +104,7 @@ export function createItemSystem({ color, emissive, isCoin }) {
     update(dt, speed, density = 0) {
       for (const item of items) {
         if (item.active) {
-          item.z += speed * (isCoin ? 0.36 : 0.4);
+          item.z += speed * travelRate;
           item.mesh.position.z = item.z;
           item.mesh.rotation.x += dt * (isCoin ? 4.2 : 3.4);
           item.mesh.rotation.y += dt * (isCoin ? 5.2 : 3.8);

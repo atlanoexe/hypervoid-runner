@@ -29,7 +29,9 @@ export function createEngine(container) {
   scene.add(ambient, key);
 
   let driftX = 0;
+  let driftY = 0;
   let roll = 0;
+  let pitch = 0;
   let shake = 0;
   let pulse = 0;
 
@@ -51,9 +53,11 @@ export function createEngine(container) {
       shake = Math.min(1.5, shake + amount);
       pulse = Math.min(1.1, pulse + amount * 0.55);
     },
-    update(dt, elapsed, speed, playerX, steer) {
+    update(dt, elapsed, speed, playerX, playerY, steerX, steerY) {
       driftX = lerp(driftX, playerX * 0.16, Math.min(1, dt * 4));
-      roll = lerp(roll, -steer * 0.04, Math.min(1, dt * 5));
+      driftY = lerp(driftY, playerY * 0.12, Math.min(1, dt * 4));
+      roll = lerp(roll, -steerX * 0.04, Math.min(1, dt * 5));
+      pitch = lerp(pitch, steerY * 0.028, Math.min(1, dt * 5));
       shake = Math.max(0, shake - dt * 1.9);
       pulse = Math.max(0, pulse - dt * 2.2);
 
@@ -61,8 +65,9 @@ export function createEngine(container) {
       const jitterY = Math.cos(elapsed * 42) * shake * 0.05;
 
       camera.position.x = baseCamera.x + driftX + jitterX;
-      camera.position.y = baseCamera.y + jitterY;
+      camera.position.y = baseCamera.y + driftY + jitterY;
       camera.position.z = baseCamera.z - Math.min(0.65, (speed - 1) * 0.12) + pulse * 0.08;
+      camera.rotation.x = pitch + jitterY * 0.01;
       camera.rotation.z = roll + jitterX * 0.015;
       camera.fov = 65 + Math.min(9, (speed - 1) * 2.2) + pulse * 1.8;
       camera.updateProjectionMatrix();

@@ -14,7 +14,8 @@ import {
   MAX_SPEED,
   PLAYER_Y,
   SPAWN_LOOKAHEAD,
-  SPEED_SMOOTHING
+  SPEED_SMOOTHING,
+  VERTICAL_LIMIT
 } from '../core/constants.js';
 
 export function createGame(root, { onScore, onGameOver, onFeedback = () => {} }) {
@@ -36,6 +37,7 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   let speed = BASE_SPEED;
   let targetSpeed = BASE_SPEED;
   let targetX = 0;
+  let targetY = PLAYER_Y;
   let coinSpawnZ = -26;
   let obstacleSpawnZ = -18;
 
@@ -57,14 +59,18 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
   }
 
   function updateSpawns(difficulty) {
-    if (coinSpawnZ > -SPAWN_LOOKAHEAD) coinSpawnZ = coins.spawnAhead(coinSpawnZ, difficulty);
-    if (obstacleSpawnZ > -SPAWN_LOOKAHEAD) obstacleSpawnZ = obstacles.spawnAhead(obstacleSpawnZ, difficulty);
+    while (coinSpawnZ > -SPAWN_LOOKAHEAD) {
+      coinSpawnZ = coins.spawnAhead(coinSpawnZ, difficulty);
+    }
+    while (obstacleSpawnZ > -SPAWN_LOOKAHEAD) {
+      obstacleSpawnZ = obstacles.spawnAhead(obstacleSpawnZ, difficulty);
+    }
   }
 
   function checkCollisions() {
     for (const coin of coins.items) {
       if (!coin.active) continue;
-      if (hitTest(player.mesh.position.x, PLAYER_Y, coin)) {
+      if (hitTest(player.mesh.position.x, player.mesh.position.y, coin)) {
         coins.collect(coin);
         score.add(1);
         player.pulse(0.75);
@@ -76,14 +82,14 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
     for (const obstacle of obstacles.items) {
       if (!obstacle.active) continue;
 
-      if (hitTest(player.mesh.position.x, PLAYER_Y, obstacle)) {
+      if (hitTest(player.mesh.position.x, player.mesh.position.y, obstacle)) {
         player.pulse(1.15);
         engine.bump(0.95);
         endGame();
         return;
       }
 
-      if (!obstacle.nearMissed && nearMissTest(player.mesh.position.x, PLAYER_Y, obstacle)) {
+      if (!obstacle.nearMissed && nearMissTest(player.mesh.position.x, player.mesh.position.y, obstacle)) {
         obstacle.nearMissed = true;
         player.pulse(0.25);
         engine.bump(0.26);
@@ -100,31 +106,35 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
     if (running) {
       const live = score.snapshot();
       const difficulty = difficultyFor(live.time);
-      const steer = input.axis();
+      const steer = input.axes();
 
       // Speed and spawn pressure rise together, but lerp keeps the ramp readable.
       targetSpeed = Math.min(MAX_SPEED, BASE_SPEED + live.time * (0.04 + difficulty * 0.02));
       speed = lerp(speed, targetSpeed, Math.min(1, dt * SPEED_SMOOTHING));
+      coinSpawnZ += speed * coins.travelRate;
+      obstacleSpawnZ += speed * obstacles.travelRate;
 
-      targetX = clamp(targetX + steer * dt * (10.5 + speed * 1.35), -LANE_LIMIT, LANE_LIMIT);
+      targetX = clamp(targetX + steer.x * dt * (10.5 + speed * 1.35), -LANE_LIMIT, LANE_LIMIT);
+      targetY = clamp(targetY + steer.y * dt * (8.1 + speed * 1.1), PLAYER_Y - VERTICAL_LIMIT, PLAYER_Y + VERTICAL_LIMIT);
       player.mesh.position.x = lerp(player.mesh.position.x, targetX, Math.min(1, dt * (8.3 + speed)));
+      player.mesh.position.y = lerp(player.mesh.position.y, targetY, Math.min(1, dt * (7.6 + speed)));
 
       updateSpawns(difficulty);
       coins.update(dt, speed, difficulty);
       obstacles.update(dt, speed, difficulty);
-      checkCollisions();
 
       wormhole.update(speed, elapsed, difficulty);
       particles.update(dt, speed, difficulty);
-      player.update(elapsed, steer, speed, dt);
-      engine.update(dt, elapsed, speed, player.mesh.position.x, steer);
+      player.update(elapsed, steer.x, steer.y, speed, dt, targetY);
+      checkCollisions();
+      engine.update(dt, elapsed, speed, player.mesh.position.x, player.mesh.position.y, steer.x, steer.y);
 
       if (running) onScore({ ...score.snapshot(), username, speed });
     } else {
       wormhole.update(BASE_SPEED, elapsed, 0.08);
       particles.update(dt, BASE_SPEED, 0.08);
-      player.update(elapsed, 0, BASE_SPEED, dt);
-      engine.update(dt, elapsed, BASE_SPEED, player.mesh.position.x, 0);
+      player.update(elapsed, 0, 0, BASE_SPEED, dt, targetY);
+      engine.update(dt, elapsed, BASE_SPEED, player.mesh.position.x, player.mesh.position.y, 0, 0);
     }
 
     engine.composer.render();
@@ -139,7 +149,9 @@ export function createGame(root, { onScore, onGameOver, onFeedback = () => {} })
       speed = BASE_SPEED;
       targetSpeed = BASE_SPEED;
       targetX = 0;
+      targetY = PLAYER_Y;
       player.mesh.position.x = 0;
+      player.mesh.position.y = PLAYER_Y;
       coinSpawnZ = -26;
       obstacleSpawnZ = -18;
       resetPools();

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_Y, PLAYER_Z } from '../core/constants.js';
+import { PLAYER_SCALE, PLAYER_Y, PLAYER_Z } from '../core/constants.js';
 import { lerp } from '../utils/math.js';
 
 export function createPlayer() {
@@ -54,9 +54,11 @@ export function createPlayer() {
 
   group.add(body, nose, leftWing, rightWing, stabilizer, core);
   group.position.set(0, PLAYER_Y, PLAYER_Z);
+  group.scale.setScalar(PLAYER_SCALE);
 
   let bank = 0;
   let pitch = 0.12;
+  let yaw = 0;
   let glowPulse = 0;
 
   return {
@@ -64,15 +66,20 @@ export function createPlayer() {
     pulse(amount = 0.6) {
       glowPulse = Math.min(1.6, glowPulse + amount);
     },
-    update(elapsed, steer, speed, dt) {
-      bank = lerp(bank, -steer * 0.58, Math.min(1, dt * 8));
-      pitch = lerp(pitch, 0.12 + Math.min(0.18, (speed - 1) * 0.045), Math.min(1, dt * 4));
+    update(elapsed, steerX, steerY, speed, dt, targetY = PLAYER_Y) {
+      bank = lerp(bank, -steerX * 0.58, Math.min(1, dt * 8));
+      pitch = lerp(
+        pitch,
+        0.12 + Math.min(0.18, (speed - 1) * 0.045) + steerY * 0.22,
+        Math.min(1, dt * 4)
+      );
+      yaw = lerp(yaw, steerX * 0.14, Math.min(1, dt * 5));
       glowPulse = Math.max(0, glowPulse - dt * 2.6);
 
       group.rotation.z = bank;
-      group.rotation.y = steer * 0.14;
+      group.rotation.y = yaw;
       group.rotation.x = pitch + Math.sin(elapsed * 5.2) * 0.025;
-      group.position.y = PLAYER_Y + Math.sin(elapsed * 3.8) * 0.08;
+      group.position.y = targetY + Math.sin(elapsed * 3.8) * 0.08;
 
       core.rotation.x = elapsed * 4;
       core.rotation.y = elapsed * 3;
