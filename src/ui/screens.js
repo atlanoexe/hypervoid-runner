@@ -72,7 +72,7 @@ export function createGameOverScreen(root) {
 export function createLoadingScreen(root) {
   const panel = cardTemplate(
     'Loading Player',
-    '<p class="lede">Loading Mirage controller assets...</p><div class="loading-stack"><div class="progress-shell"><div id="progress-fill" class="progress-fill"></div></div><p id="progress-text" class="progress-text">0%</p></div>'
+    '<p class="lede">Game assets loading...</p><div class="loading-stack"><div class="progress-shell"><div id="progress-fill" class="progress-fill"></div></div><p id="progress-text" class="progress-text">0%</p></div>'
   );
   root.appendChild(panel);
 
